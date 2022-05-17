@@ -30,6 +30,18 @@ namespace TCPServer
 
         private const string CODE_SET_PASSPORT = "/setpassport";
 
+        private const string CODE_SEND_APP = "/sendapp";
+        private const string CODE_SEND_APP_FAILED = "401";
+
+        private const string CODE_GET_USER_APPS = "/getuserapps";
+        private const string CODE_GET_USER_APPS_FAILED = "501";
+
+        private const string CODE_GET_USER_NOTIFICATIONS = "/getusernot";
+        private const string CODE_GET_USER_NOTIFICATIONS_FAILED = "601";
+
+        private const string CODE_GET_ARMYTICKET = "/getarmyticket";
+
+        private const string CODE_GET_USER_ADDRESS = "/getuseraddress";
 
         public ClientObject(TcpClient client)
         {
@@ -65,7 +77,7 @@ namespace TCPServer
 
         private void WaitingRequest()
         {
-            byte[] buffer = new byte[256];
+            byte[] buffer = new byte[1024];
             int length = stream.Read(buffer, 0, buffer.Length);
             string request = Encoding.UTF8.GetString(buffer, 0, length).Trim();
 
@@ -93,8 +105,10 @@ namespace TCPServer
                     var user = JsonConvert.DeserializeObject<User>(json);
 
                     db.CreateUser(user);
+                    db.AddUserAddress(user.address);
 
                     SendAnswer(CODE_SIGNUP_SUCCESS);
+                    db.SendNotification(new Notification("welcome", user.email, "Поздравляем с успешной регистрацией!"));
                     break;
 
                 case CODE_GET_PASSPORT:
@@ -115,10 +129,49 @@ namespace TCPServer
                     if (db.SetPassport(pass))
                     {
                         SendAnswer("OK");
+                        db.SendNotification(new Notification("voenkomat", pass.email, $"Паспорт {pass.series} успешно проверен!"));
                     }
                     else SendAnswer("NOT OK");
 
+                    break;
 
+                case CODE_SEND_APP:
+                    request = request.Replace(request.Split()[0] + " ", "");
+                    //Console.WriteLine(request);
+
+                    var app = JsonConvert.DeserializeObject<Application>(request);
+                    if (db.SendApplication(app)) SendAnswer("OK");
+                    else SendAnswer(CODE_SEND_APP_FAILED);
+                    break;
+
+                case CODE_GET_USER_APPS:
+                    request = request.Replace(request.Split()[0] + " ", "");
+                    var apps = db.GetUserApplications(request);
+
+                    if (apps.applications.Length != 0) SendAnswer(JsonConvert.SerializeObject(apps));
+                    else SendAnswer(CODE_GET_USER_APPS_FAILED);
+
+                    break;
+
+                case CODE_GET_USER_NOTIFICATIONS:
+                    request = request.Replace(request.Split()[0] + " ", "");
+                    var notifications = db.GetUserNotifications(request);
+
+                    SendAnswer(JsonConvert.SerializeObject(notifications));
+                    break;
+
+                case CODE_GET_ARMYTICKET:
+                    request = request.Replace(request.Split()[0] + " ", "");
+                    var ticket = db.GetArmyTicket(request);
+
+                    SendAnswer(JsonConvert.SerializeObject(ticket));
+                    break;
+
+                case CODE_GET_USER_ADDRESS:
+                    request = request.Replace(request.Split()[0] + " ", "");
+                    var address = db.GetUserAddress(request);
+
+                    SendAnswer(JsonConvert.SerializeObject(address));
                     break;
             }
         }

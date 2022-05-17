@@ -17,7 +17,10 @@ namespace TCPServer
 
         private string users_table_name = "users_table";
         private string docs_passport_table_name = "docs_passports_table";
+        private string docs_armyticket_table_name = "docs_armyticket_table";
         private string users_applications_table_name = "users_applications_table";
+        private string users_notifications_table = "users_notifications_table";
+        private string users_addresses_table = "users_addresses_table";
 
         public void Initialize()
         {
@@ -49,7 +52,7 @@ namespace TCPServer
             var user = GetUser(email);
             if (user.password != p)
             {
-                return user;
+                return new User("-1", "-1", "-1", "-1", "-1", "-1", "-1");
             }
             return user;
         }
@@ -110,9 +113,39 @@ namespace TCPServer
             return true;
         }
 
+        public void SetArmyTicket(ArmyTicket ticket)
+        {
+            string query = $"INSERT INTO {docs_armyticket_table_name} (email, ticket_id) VALUES('{ticket.email}', '{ticket.ticket_id}')";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.ExecuteNonQuery();
+            Connection(false);
+        }
+
+        public ArmyTicket GetArmyTicket(string email)
+        {
+            string query = $"SELECT * FROM {docs_armyticket_table_name} WHERE email = '{email}'";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            MySqlDataReader reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                ArmyTicket ticket = new ArmyTicket((string)reader["email"], (string)reader["ticket_id"]);
+
+                Connection(false);
+                return ticket;
+            }
+
+            Connection(false);
+            return new ArmyTicket("-1", "-1"); //Wrong email or unknown ticket
+        }
+
         public Application GetUserApplication(string email, string title)
         {
-            string query = $"SELECT * FROM {users_applications_table_name} WHERE email = '{email}', title = '{title}'";
+            string query = $"SELECT * FROM {users_applications_table_name} WHERE from_email = '{email}' AND title = '{title}'";
 
             Connection(true);
             MySqlCommand cmd = new MySqlCommand(query, conn);
@@ -130,10 +163,10 @@ namespace TCPServer
             return new Application("-1", "-1", -1, "-1", "-1"); //Wrong email or title
         }
 
-        public Application[] GetUserApplications(string email)
+        public Applications GetUserApplications(string email)
         {
             List<Application> applications = new List<Application>();
-            string query = $"SELECT * FROM {users_applications_table_name} WHERE email = '{email}'";
+            string query = $"SELECT * FROM {users_applications_table_name} WHERE from_email = '{email}'";
 
             Connection(true);
             MySqlCommand cmd = new MySqlCommand(query, conn);
@@ -147,7 +180,7 @@ namespace TCPServer
 
             Connection(false);
 
-            return applications.ToArray();
+            return new Applications(applications.ToArray());
         }
 
         public bool SendApplication(Application application)
@@ -155,12 +188,103 @@ namespace TCPServer
             if (GetUserApplication(application.from_email, application.title).from_email != "-1") return false; 
 
             Connection(true);
-            string query = $"INSERT INTO {users_applications_table_name} (from_email, to_email, timestamp, title, description) VALUES('{application.from_email}', '{application.timestamp}', '{application.to_email}', '{application.title}', '{application.description}')";
+            string query = $"INSERT INTO {users_applications_table_name} (from_email, to_email, timestamp, title, description) VALUES('{application.from_email}', '{application.to_email}', '{application.timestamp}', '{application.title}', '{application.description}')";
             MySqlCommand cmd = new MySqlCommand(query, conn);
             cmd.ExecuteNonQuery();
             Connection(false);
 
             return true;
+        }
+
+        public Applications GetUserApplications()
+        {
+            List<Application> applications = new List<Application>();
+            string query = $"SELECT * FROM {users_applications_table_name} WHERE accepted = '0'";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            MySqlDataReader reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                Application application = new Application((string)reader["from_email"], (string)reader["to_email"], (int)reader["timestamp"], (string)reader["title"], (string)reader["description"]);
+                applications.Add(application);
+            }
+
+            Connection(false);
+
+            return new Applications(applications.ToArray());
+        }
+
+        public void AcceptUserApplication(string email, string title)
+        {
+            string query = $"UPDATE {users_applications_table_name} SET accepted = '1' WHERE from_email = '{email}' AND title = '{title}'";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.ExecuteNonQuery();
+            Connection(false);
+        }
+
+        public Notifications GetUserNotifications(string email)
+        {
+            List<Notification> notifications = new List<Notification>();
+            string query = $"SELECT * FROM {users_notifications_table} WHERE recipient = '{email}'";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            MySqlDataReader reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                Notification notification = new Notification((string)reader["sender"], (string)reader["recipient"], (string)reader["message"]);
+                notifications.Add(notification);
+            }
+
+            Connection(false);
+
+            return new Notifications(notifications.ToArray());
+        }
+
+        public void SendNotification(Notification notification)
+        {
+            string query = $"INSERT INTO {users_notifications_table} (sender, recipient, message) VALUES('{notification.sender}', '{notification.recipient}', '{notification.message}')";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.ExecuteNonQuery();
+            Connection(false);
+        }
+
+        public void AddUserAddress(Address address)
+        {
+            string query = $"INSERT INTO {users_addresses_table} (email, city, street, house_number, flat_number) VALUES('{address.email}', '{address.city}', '{address.street}', '{address.house_number}', '{address.flat_number}')";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.ExecuteNonQuery();
+            Connection(false);
+        }
+
+        public Address GetUserAddress(string email)
+        {
+            string query = $"SELECT * FROM {users_addresses_table} WHERE email = '{email}'";
+
+            Connection(true);
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            MySqlDataReader reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                Address address = new Address((string)reader["email"], (string)reader["city"], (string)reader["street"], (string)reader["house_number"], (int)reader["flat_number"]);
+
+                Connection(false);
+                return address;
+            }
+
+            Connection(false);
+
+            return new Address("-1", "-1", "-1", "-1", -1);
         }
     }
 }

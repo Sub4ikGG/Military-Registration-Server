@@ -15,6 +15,7 @@ namespace TCPServer
         public string birth_date;
         public string email;
         public string password;
+        public Address address;
 
         public User(string fn, string ln, string lnn, string s, string e, string p, string bd)
         {

@@ -12,6 +12,10 @@ namespace TCPServer
             Console.WriteLine($"Server started: {server.LocalEndpoint}");
             server.Start();
 
+            ApplicationHandler handler = new ApplicationHandler();
+            Thread handler_thread = new Thread(handler.Process);
+            handler_thread.Start();
+
             while(true) /*Слушатель подключений*/
             {
                 TcpClient client = server.AcceptTcpClient();
